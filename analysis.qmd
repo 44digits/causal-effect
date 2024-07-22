@@ -1,0 +1,68 @@
+---
+title: "Casual Effect"
+author: "Andrew"
+format: html
+execute: 
+  echo: false
+---
+
+```{r}
+#| message: FALSE
+
+library(tidyverse)
+library(primer.data)
+library(tidybayes)
+library(brms)
+library(gtsummary)
+
+```
+
+```{r}
+ch6 <- trains |>
+  select(att_end, treatment)
+```
+
+Using data from a 2012 survey of Boston train riders, we will examine the causal effect of exposure to Spanish-speakers on attitudes of immigration among adults in Chicago.  The intercept is 10.  The estimated average causal effect is 1.5.
+
+
+```{r}
+#| cache: TRUE
+
+fit_gauss <- brm(formula = att_end ~ treatment,
+    data = ch6,
+    family = gaussian(),
+    refresh = 0,
+    silent = 2,
+    seed = 9)
+
+```
+
+```{r}
+tbl_regression(fit_gauss)
+```
+
+```{r}
+ndata <- tibble(treatment = c("Treated", "Control"))
+
+```
+
+```{r}
+fit_gauss |>
+  add_epred_draws(newdata = ndata) |>
+  select(treatment, .draw, .epred) |>
+  pivot_wider(id_cols = .draw,
+              names_from = treatment,
+              values_from = .epred) |>
+  mutate(causal_effect = Treated - Control) |>
+  select(- .draw) |>
+  ggplot(aes(x=causal_effect)) +
+    geom_histogram(aes(y=after_stat(count / sum(count))),
+                   bins = 100) +
+    scale_y_continuous(labels = scales::percent_format()) +
+    theme_classic() +
+    labs(title = "Posterior for Average Treatment Effect",
+         subtitle ="Exposure to Spanish-speakers shifts immigration attitudes rightward",
+         x = "Difference in Attitude",
+         y = "Probability")
+```
+
